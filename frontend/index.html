@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SMERF AI System</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="background-glow background-glow-left"></div>
+    <div class="background-glow background-glow-right"></div>
+
+    <main class="app-shell">
+      <section class="hero-card">
+        <p class="eyebrow">Selective Multi-LLM Evaluation and Refinement</p>
+        <h1>SMERF AI System</h1>
+        <p class="subtitle">
+          Submit a prompt to the SMERF pipeline and inspect the final answer,
+          complexity routing, model usage, and latency.
+        </p>
+      </section>
+
+      <section class="input-card">
+        <label class="field-label" for="queryInput">Your Query</label>
+        <textarea
+          id="queryInput"
+          placeholder="Ask SMERF something complex, like designing a scalable system..."
+          rows="7"
+        ></textarea>
+
+        <div class="actions">
+          <button id="submitButton" type="button">Submit</button>
+          <div id="loadingState" class="loading-state hidden" aria-live="polite">
+            <span class="spinner"></span>
+            <span>Running SMERF pipeline...</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="errorCard" class="result-card error-card hidden" aria-live="polite"></section>
+
+      <section id="resultCard" class="result-card hidden">
+        <div class="result-header">
+          <div>
+            <p class="eyebrow">Pipeline Output</p>
+            <h2>Response Summary</h2>
+          </div>
+          <span id="complexityBadge" class="badge">-</span>
+        </div>
+
+        <div class="metrics-grid">
+          <article class="metric-tile">
+            <span class="metric-label">Models Used</span>
+            <strong id="modelsUsed">0</strong>
+          </article>
+          <article class="metric-tile">
+            <span class="metric-label">Latency</span>
+            <strong id="latencyValue">-</strong>
+          </article>
+          <article class="metric-tile">
+            <span class="metric-label">Stage</span>
+            <strong id="stageValue">-</strong>
+          </article>
+        </div>
+
+        <div class="content-block">
+          <h3>Best Model</h3>
+          <div id="bestModelValue" class="best-model-chip">-</div>
+        </div>
+
+        <div class="content-block">
+          <h3>Query</h3>
+          <p id="queryValue" class="content-text"></p>
+        </div>
+
+        <div class="content-block">
+          <h3>Final Answer</h3>
+          <div id="answerValue" class="answer-box"></div>
+        </div>
+
+        <div class="content-block">
+          <h3>Models</h3>
+          <ul id="modelsList" class="model-list"></ul>
+        </div>
+
+        <div class="content-block">
+          <h3>Scores</h3>
+          <div id="scoresList" class="scores-list"></div>
+        </div>
+
+        <div class="content-block">
+          <h3>Why This Answer?</h3>
+          <div id="reasoningList" class="reasoning-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
