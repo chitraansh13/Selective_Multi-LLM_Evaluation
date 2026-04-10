@@ -13,7 +13,79 @@ logger = get_logger(__name__)
 class QueryRouter:
     """Hybrid query router that combines heuristic and LLM signals."""
 
-    HIGH_SIGNAL_KEYWORDS = {"design", "architecture", "distributed", "scalable", "system", "compare", "analyze"}
+    HIGH_SIGNAL_KEYWORDS = {
+        "design",
+        "architecture",
+        "distributed",
+        "scalable",
+        "system",
+        "compare",
+        "analyze",
+        "clone",
+        "build",
+        "create",
+        "implement",
+        "develop",
+        "backend",
+        "frontend",
+        "database",
+        "infrastructure",
+        "microservices",
+        "streaming",
+        "recommendation",
+        "authentication",
+        "real-time",
+    }
+    BUILD_INTENTS = (
+        "build",
+        "create",
+        "make",
+        "implement",
+        "develop",
+        "set up",
+        "setup",
+        "launch",
+        "ship",
+    )
+    CLONE_PATTERNS = (
+        "clone of",
+        "like netflix",
+        "like youtube",
+        "like instagram",
+        "like spotify",
+        "like whatsapp",
+        "like uber",
+        "like amazon",
+        "like chatgpt",
+    )
+    COMPLEX_DOMAINS = (
+        "app",
+        "website",
+        "platform",
+        "product",
+        "system",
+        "backend",
+        "frontend",
+        "database",
+        "api",
+        "dashboard",
+        "pipeline",
+        "architecture",
+        "workflow",
+        "infrastructure",
+        "cache",
+        "streaming",
+        "recommendation",
+        "authentication",
+        "clone",
+    )
+    SIMPLE_PATTERNS = (
+        "what is",
+        "who is",
+        "define",
+        "capital of",
+        "meaning of",
+    )
 
     def __init__(
         self,
@@ -42,6 +114,7 @@ class QueryRouter:
                 "matched_keywords": heuristic["matched_keywords"],
                 "multiple_concepts": heuristic["multiple_concepts"],
                 "word_count": heuristic["word_count"],
+                "detected_intents": heuristic["detected_intents"],
                 "llm_enabled": self.config.enable_llm_router,
                 "llm_raw": llm_result,
             },
@@ -66,6 +139,7 @@ class QueryRouter:
         matched_keywords = [
             keyword for keyword in self.config.router_keywords if keyword in lowered
         ]
+        detected_intents = self._detect_intents(lowered)
 
         score = 0.0
         if len(words) > self.config.router_length_threshold:
@@ -81,11 +155,23 @@ class QueryRouter:
         if multiple_concepts:
             score += 0.3
 
+        if detected_intents:
+            score += min(0.45, 0.18 * len(detected_intents))
+
         if lowered.startswith(("how to", "how does", "why does", "explain", "analyze", "compare", "design")):
             score += 0.12
 
+        if self._is_build_or_clone_request(lowered):
+            score += 0.35
+
+        if self._looks_like_project_scoping_request(lowered):
+            score += 0.25
+
         if " in detail" in lowered or "step by step" in lowered:
             score += 0.15
+
+        if self._is_obviously_simple_fact(lowered, len(words), matched_keywords):
+            score = min(score, 0.18)
 
         score = min(score, 1.0)
         return {
@@ -93,6 +179,7 @@ class QueryRouter:
             "matched_keywords": matched_keywords,
             "multiple_concepts": multiple_concepts,
             "word_count": len(words),
+            "detected_intents": detected_intents,
         }
 
     def _has_multiple_concepts(
@@ -111,9 +198,61 @@ class QueryRouter:
             " design",
             " cache",
             " complexity",
+            " backend",
+            " frontend",
+            " database",
+            " deployment",
+            " recommendation",
         ]
         marker_hits = sum(1 for marker in concept_markers if marker in lowered_query)
         return len(matched_keywords) >= 2 or marker_hits >= 2
+
+    def _detect_intents(self, lowered_query: str) -> list[str]:
+        intents: list[str] = []
+        if any(intent in lowered_query for intent in self.BUILD_INTENTS):
+            intents.append("build")
+        if any(pattern in lowered_query for pattern in self.CLONE_PATTERNS):
+            intents.append("clone")
+        if any(domain in lowered_query for domain in self.COMPLEX_DOMAINS):
+            intents.append("domain_scope")
+        if any(token in lowered_query for token in ("step by step", "roadmap", "plan", "workflow")):
+            intents.append("planning")
+        if any(token in lowered_query for token in ("scale", "scaling", "production", "deploy", "deployment")):
+            intents.append("production")
+        return intents
+
+    def _is_build_or_clone_request(self, lowered_query: str) -> bool:
+        has_build_intent = any(intent in lowered_query for intent in self.BUILD_INTENTS)
+        has_clone_or_domain = any(pattern in lowered_query for pattern in self.CLONE_PATTERNS) or any(
+            domain in lowered_query for domain in self.COMPLEX_DOMAINS
+        )
+        return has_build_intent and has_clone_or_domain
+
+    def _looks_like_project_scoping_request(self, lowered_query: str) -> bool:
+        scoping_terms = (
+            "features",
+            "tech stack",
+            "architecture",
+            "database",
+            "backend",
+            "frontend",
+            "api",
+            "workflow",
+            "system design",
+        )
+        return any(term in lowered_query for term in scoping_terms)
+
+    def _is_obviously_simple_fact(
+        self,
+        lowered_query: str,
+        word_count: int,
+        matched_keywords: list[str],
+    ) -> bool:
+        return (
+            word_count <= 5
+            and not matched_keywords
+            and any(lowered_query.startswith(pattern) for pattern in self.SIMPLE_PATTERNS)
+        )
 
     async def _llm_classification(self, query: str) -> dict[str, Any] | None:
         if not self.config.enable_llm_router or self.classifier_client is None:

@@ -114,7 +114,7 @@ $env:SMERF_ENABLE_LLM_ROUTER="false"
 ### 4. Run the backend API
 
 ```powershell
-uvicorn main:app --reload
+python -m uvicorn main:app --reload
 ```
 
 Backend API will be available at:

@@ -25,6 +25,11 @@ QUERIES = [
     "Explain transformers architecture in deep learning",
     "How to build distributed cache system",
     "Analyze time complexity of merge sort in detail",
+    "I want to make a clone of Netflix",
+    "Build a YouTube clone with authentication and streaming",
+    "Create a dashboard app for hospital management",
+    "Develop an ecommerce website like Amazon",
+    "Plan the backend architecture for a food delivery app",
 ]
 
 
@@ -40,7 +45,21 @@ async def main() -> None:
         print(json.dumps(result, indent=2))
 
         lowered = query.lower()
-        if "design" in lowered or "architecture" in lowered:
+        if any(
+            token in lowered
+            for token in (
+                "design",
+                "architecture",
+                "clone",
+                "build",
+                "create",
+                "develop",
+                "backend",
+                "streaming",
+                "dashboard",
+                "website",
+            )
+        ):
             assert result["label"] == "complex", f"Expected complex for: {query}"
 
 
