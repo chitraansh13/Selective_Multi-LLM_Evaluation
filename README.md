@@ -81,10 +81,6 @@ Install these if you want to use real OpenAI-compatible models or local HTTP mod
 
 ### 1. Open the project folder
 
-```powershell
-cd "G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject"
-```
-
 ### 2. Install dependencies
 
 ```powershell
