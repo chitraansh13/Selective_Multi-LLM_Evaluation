@@ -17,8 +17,10 @@ Selective Multi-LLM Evaluation and Refinement System (SMERF) is a modular AI orc
 
 ```text
 SMERF/
+|-- app.py
 |-- main.py
 |-- config.py
+|-- requirements.txt
 |-- services/
 |   |-- llm_clients.py
 |   `-- router.py
@@ -39,10 +41,21 @@ SMERF/
 |   |-- index.html
 |   |-- style.css
 |   `-- script.js
+|-- public/
+|   |-- index.html
+|   |-- style.css
+|   `-- script.js
 `-- tests/
     |-- test_queries.py
     `-- test_pipeline.py
 ```
+
+Notes:
+
+- `main.py` is the local FastAPI entrypoint and demo runner.
+- `app.py` is a tiny deployment entrypoint used for Vercel.
+- `frontend/` is the editable frontend source for local development.
+- `public/` is the deployment-ready static frontend folder used by Vercel.
 
 ## Requirements
 
@@ -117,6 +130,10 @@ Useful endpoints:
 - `GET /health`
 - `POST /query`
 
+For local development, use `main:app`.
+
+The separate `app.py` file exists only to make Vercel deployment simpler.
+
 ### 5. Run the built-in demo without the API server
 
 ```powershell
@@ -136,6 +153,28 @@ The frontend sends requests to:
 - `http://127.0.0.1:8000/query`
 
 Make sure the FastAPI server is running before testing the UI.
+
+Local frontend behavior:
+
+- if you open `frontend/index.html` directly from your file system, the frontend sends requests to `http://127.0.0.1:8000/query`
+- if the project is deployed, the frontend automatically uses the same deployed origin for API requests
+
+## Local development workflow
+
+For most people running this project on their own machine, the recommended flow is:
+
+1. install dependencies
+2. run the backend with `uvicorn main:app --reload`
+3. open `frontend/index.html`
+4. test prompts in the browser
+5. optionally run `python main.py` for a terminal-only demo
+
+You usually do not need to touch:
+
+- `app.py`
+- `public/`
+
+Those exist mainly to support deployment on Vercel.
 
 ## How to test
 
@@ -225,6 +264,16 @@ By default, the project uses mock clients:
 - `mock-critic`
 
 This makes the project easy to run without API keys.
+
+## Deployment note
+
+This repository now contains a few deployment-oriented files:
+
+- `app.py`
+- `requirements.txt`
+- `public/`
+
+They were added so the same project can be deployed on Vercel without changing the local development workflow.
 
 ## Where to read more
 

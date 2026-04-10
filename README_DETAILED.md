@@ -56,17 +56,24 @@ SMERF is divided into a few major layers.
 
 Files:
 
+- `app.py`
 - `main.py`
 - `routers/query.py`
 - `models/schemas.py`
 
 Responsibilities:
 
+- exposes a deployment-friendly app entrypoint for Vercel
 - starts the FastAPI app
 - enables CORS
 - exposes `/query`
 - handles global errors
 - returns structured success/error responses
+
+Important distinction:
+
+- `main.py` is the main local entrypoint and also contains the demo runner
+- `app.py` is a very small wrapper that simply exposes the FastAPI app for hosting platforms such as Vercel
 
 ### 4.2 Configuration layer
 
@@ -131,6 +138,9 @@ Files:
 - `frontend/index.html`
 - `frontend/style.css`
 - `frontend/script.js`
+- `public/index.html`
+- `public/style.css`
+- `public/script.js`
 
 Responsibilities:
 
@@ -138,6 +148,15 @@ Responsibilities:
 - async helpers
 - browser-based query interface
 - rendering of final answer, scores, best model, and reasoning
+- local editable frontend source in `frontend/`
+- deployment-ready static frontend in `public/`
+
+The project now keeps both `frontend/` and `public/`:
+
+- `frontend/` is the source developers edit during local work
+- `public/` is the static folder used for deployment on Vercel
+
+This allows local development and deployment to coexist without changing the main architecture.
 
 ## 5. How SMERF works step by step
 
@@ -612,6 +631,36 @@ Why plain HTML/CSS/JS was used:
 - no build system required
 - low friction for quick testing
 
+### 7.1 Local frontend behavior
+
+For local runs, you should open:
+
+- `frontend/index.html`
+
+and run the backend locally using:
+
+```powershell
+uvicorn main:app --reload
+```
+
+The frontend script is designed to behave differently depending on where it is opened:
+
+- if opened directly as a file in the browser, it calls `http://127.0.0.1:8000/query`
+- if hosted on a deployment platform, it uses the same deployed origin and calls `/query`
+
+This keeps the local developer workflow simple while also supporting hosted environments.
+
+### 7.2 Deployment frontend behavior
+
+The `public/` directory exists for deployment. On Vercel, static frontend files can be served directly from `public/`, while the FastAPI backend is exposed through the app entrypoint.
+
+This means:
+
+- `/` serves the frontend
+- `/query` serves the backend API
+
+without needing a separate frontend framework or a separate backend server process.
+
 ## 8. Why this project can help
 
 SMERF can help in several ways depending on the use case.
@@ -730,6 +779,16 @@ pip install fastapi uvicorn pydantic
 uvicorn main:app --reload
 ```
 
+For local development, this is the correct way to run the backend.
+
+Even though the repository contains `app.py`, local users should normally keep using:
+
+```powershell
+uvicorn main:app --reload
+```
+
+because `main.py` is the primary local application entrypoint.
+
 ### Run demo without API server
 
 ```powershell
@@ -752,6 +811,31 @@ Open:
 and make sure the backend is already running at:
 
 - `http://127.0.0.1:8000`
+
+### 13.1 Local run summary
+
+If you only want to run the project locally, use this checklist:
+
+1. install dependencies
+2. run `uvicorn main:app --reload`
+3. open `frontend/index.html`
+4. test prompts in the browser
+5. optionally run `python tests\\test_queries.py`
+6. optionally run `python tests\\test_pipeline.py`
+
+You do not need Vercel-specific files for local execution.
+
+### 13.2 Why extra files now exist
+
+The repository also includes:
+
+- `app.py`
+- `requirements.txt`
+- `public/`
+
+These were added for deployment compatibility, especially for Vercel hosting.
+
+They do not replace the local development flow. They simply allow the same project to be hosted online later.
 
 ## 14. Final takeaway
 
