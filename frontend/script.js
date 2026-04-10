@@ -1,7 +1,4 @@
-const API_URL =
-  window.location.protocol === "file:"
-    ? "http://127.0.0.1:8000/query"
-    : `${window.location.origin}/query`;
+const API_URL = "http://127.0.0.1:8000/query";
 
 const queryInput = document.getElementById("queryInput");
 const submitButton = document.getElementById("submitButton");
@@ -168,12 +165,12 @@ async function submitQuery() {
       body: JSON.stringify({ query }),
     });
 
+    if (!response.ok) {
+      throw new Error("Server error");
+    }
+
     const result = await response.json();
     console.log("API Response:", result);
-
-    if (!response.ok) {
-      throw new Error(result.error || "Server error");
-    }
 
     if (!result.success) {
       throw new Error(result.error || "Unknown server error");
