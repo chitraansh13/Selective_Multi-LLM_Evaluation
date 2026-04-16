@@ -23,31 +23,31 @@ This gives better answers than blindly trusting one model for every request.
 
 ## Backend modules involved
 
-### [main.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\main.py)
+### [main.py]
 
 Starts FastAPI, enables CORS, creates the shared pipeline instance, and exposes the `/query` API route.
 
-### [routers/query.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\routers\query.py)
+### [routers/query.py]
 
 Receives the request payload and forwards the query to the SMERF pipeline.
 
-### [pipeline/orchestrator.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\pipeline\orchestrator.py)
+### [pipeline/orchestrator.py]
 
 Acts as the central brain of the system. It coordinates routing, generation, evaluation, fusion, refinement, and final formatting.
 
-### [services/router.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\services\router.py)
+### [services/router.py]
 
 Classifies the query as `simple` or `complex`.
 
-### [services/llm_clients.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\services\llm_clients.py)
+### [services/llm_clients.py]
 
 Provides the pluggable LLM client architecture. The same pipeline can use mock models, OpenAI-compatible models, OpenRouter models, or Gemini in OpenAI-compatible mode.
 
-### [evaluators/scoring.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\evaluators\scoring.py)
+### [evaluators/scoring.py]
 
 Scores each generated answer.
 
-### [refinement/refiner.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\refinement\refiner.py)
+### [refinement/refiner.py]
 
 Improves the fused answer before it is returned.
 
@@ -71,7 +71,7 @@ POST /query
 
 ### Step 2: API router receives the request
 
-In [routers/query.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\routers\query.py), the backend validates the JSON payload and sends the query into the shared pipeline:
+In [routers/query.py], the backend validates the JSON payload and sends the query into the shared pipeline:
 
 ```python
 result = await request.app.state.pipeline.run(payload.query)
@@ -79,7 +79,7 @@ result = await request.app.state.pipeline.run(payload.query)
 
 ### Step 3: Query routing
 
-In [services/router.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\services\router.py), `QueryRouter.classify()` analyzes the query.
+In [services/router.py], `QueryRouter.classify()` analyzes the query.
 
 The router checks:
 
@@ -107,7 +107,7 @@ The router returns a structure like this:
 
 ### Step 4: Pipeline decides the path
 
-In [pipeline/orchestrator.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\pipeline\orchestrator.py), `SMERFPipeline.run()` checks the router result.
+In [pipeline/orchestrator.py], `SMERFPipeline.run()` checks the router result.
 
 If the label is `simple`:
 
@@ -150,7 +150,7 @@ Example generated responses:
 
 ### Step 6: Response evaluation
 
-In [evaluators/scoring.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\evaluators\scoring.py), `ResponseEvaluator.evaluate()` scores each answer.
+In [evaluators/scoring.py], `ResponseEvaluator.evaluate()` scores each answer.
 
 Current scoring signals include:
 
@@ -207,7 +207,7 @@ This gives the system a simple but explainable ensemble behavior.
 
 ### Step 9: Refinement
 
-In [refinement/refiner.py](G:\Users\chitr\Desktop\Folders\Sem 6\GenAI\MiniProject\refinement\refiner.py), `refine()` improves the fused answer.
+In [refinement/refiner.py], `refine()` improves the fused answer.
 
 If a real LLM is available for refinement:
 
