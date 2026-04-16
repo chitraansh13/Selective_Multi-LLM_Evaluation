@@ -70,10 +70,33 @@ function escapeHtml(value) {
 }
 
 function formatAnswer(text) {
-  return escapeHtml(text)
-    .replace(/### (.*)/g, "<h3>$1</h3>")
-    .replace(/- (.*)/g, "<li>$1</li>")
-    .replace(/\n/g, "<br>");
+  const escaped = escapeHtml(text || "");
+  const sections = escaped
+    .split(/\n{2,}/)
+    .map((section) => section.trim())
+    .filter(Boolean);
+
+  return sections
+    .map((section) => {
+      if (section.startsWith("### ")) {
+        return `<h3>${section.replace(/^### /, "")}</h3>`;
+      }
+
+      const lines = section
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      if (lines.every((line) => line.startsWith("- ") || line.startsWith("* "))) {
+        const items = lines
+          .map((line) => `<li>${line.slice(2).trim()}</li>`)
+          .join("");
+        return `<ul>${items}</ul>`;
+      }
+
+      return `<p>${lines.join("<br>")}</p>`;
+    })
+    .join("");
 }
 
 function renderModels(responseMap) {

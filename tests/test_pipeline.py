@@ -38,6 +38,7 @@ async def main() -> None:
     assert complex_result.get("fusion", {}).get("answer"), "Fusion output should exist."
     assert complex_result.get("best_model"), "Best model should be identified."
     assert complex_result.get("final_answer"), "Refined answer should exist."
+    assert "### Explanation" in complex_result["final_answer"], "Final answer should include a clean explanation section."
     assert complex_result["stage"] == "refined", "Complex path should finish in refined stage."
 
 

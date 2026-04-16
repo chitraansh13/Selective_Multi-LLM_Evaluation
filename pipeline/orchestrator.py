@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from time import perf_counter
 from typing import Any
 
@@ -103,9 +104,13 @@ class SMERFPipeline:
                 "method": "single_best",
             }
 
+        primary = self._sanitize_fusion_source(top_two[0][1])
+        secondary = self._sanitize_fusion_source(top_two[1][1])
         final_answer = (
-            f"Best Answer:\n{top_two[0][1].strip()}\n\n"
-            f"Additional Insight:\n{top_two[1][1].strip()}"
+            "Primary answer:\n"
+            f"{primary}\n\n"
+            "Supporting insights:\n"
+            f"{secondary}"
         )
         logger.info("Fused top responses from models=%s", selected_models)
         return {
@@ -114,98 +119,198 @@ class SMERFPipeline:
             "method": "score_ranked_fusion",
         }
 
-    def _format_final_answer(self, answer: str) -> str:
-        if not answer.strip():
-            return answer
+    def _sanitize_fusion_source(self, text: str) -> str:
+        cleaned = re.sub(r"\s+", " ", text.replace("\r", "\n")).strip()
+        if cleaned.count("|") >= 4:
+            fragments = [
+                fragment.strip(" -")
+                for fragment in cleaned.split("|")
+                if fragment.strip(" -")
+            ]
+            bullets = [fragment for fragment in fragments[:6] if len(fragment.split()) > 1]
+            if bullets:
+                return "\n".join(f"- {item}" for item in bullets)
+        return text.strip()
 
-        lines = [line.strip() for line in answer.splitlines()]
-        explanation_parts: list[str] = []
+    def _normalize_answer_text(self, text: str) -> str:
+        normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+        normalized = re.sub(r"[ \t]+", " ", normalized)
+        normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+        return normalized.strip()
+
+    def _extract_bullets(self, text: str) -> list[str]:
+        bullets: list[str] = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith(("- ", "* ")):
+                bullets.append(stripped[2:].strip())
+                continue
+            if "|" in stripped and stripped.count("|") >= 2:
+                parts = [part.strip(" -") for part in stripped.split("|") if part.strip(" -")]
+                bullets.extend(part for part in parts if len(part.split()) > 1)
+        return bullets
+
+    def _extract_sentences(self, text: str) -> list[str]:
+        flattened = self._normalize_answer_text(text).replace("\n", " ")
+        flattened = re.sub(r"\s+", " ", flattened)
+        return [
+            sentence.strip(" -")
+            for sentence in re.split(r"(?<=[.!?])\s+", flattened)
+            if sentence.strip()
+        ]
+
+    def _dedupe_preserve_order(self, items: list[str]) -> list[str]:
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for item in items:
+            key = item.lower().strip()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            deduped.append(item.strip())
+        return deduped
+
+    def _build_structured_answer(self, answer: str) -> str:
+        normalized = self._normalize_answer_text(answer)
+        if not normalized:
+            return ""
+
+        explanation_lines: list[str] = []
         key_insights: list[str] = []
-        tradeoffs: list[str] = []
+        notes: list[str] = []
         current_section = "explanation"
 
-        for line in lines:
+        for raw_line in normalized.splitlines():
+            line = raw_line.strip()
             if not line:
                 continue
-            lowered = line.lower()
 
-            if lowered.startswith("best answer"):
+            lowered = line.lower().rstrip(":")
+            if lowered in {"best answer", "primary answer"}:
                 current_section = "explanation"
                 continue
-            if lowered.startswith("additional insight") or lowered.startswith("key points"):
+            if lowered in {"additional insight", "supporting insights", "key points"}:
                 current_section = "insights"
-                payload = line.split(":", 1)
-                if len(payload) > 1 and payload[1].strip():
-                    key_insights.extend(
-                        item.strip(" .")
-                        for item in payload[1].split(",")
-                        if item.strip()
-                    )
                 continue
-            if lowered.startswith("refinement notes") or "trade-off" in lowered or "note" in lowered:
-                current_section = "tradeoffs"
+            if lowered == "refinement notes":
+                current_section = "notes"
                 continue
 
             if line.startswith(("- ", "* ")):
-                item = line[2:].strip()
-                if current_section == "tradeoffs":
-                    tradeoffs.append(item)
-                elif current_section == "insights":
-                    key_insights.append(item)
+                payload = line[2:].strip()
+                if current_section == "notes":
+                    notes.append(payload)
                 else:
-                    key_insights.append(item)
+                    key_insights.append(payload)
                 continue
 
-            if current_section == "explanation":
-                explanation_parts.append(line)
+            if line.lower().startswith("key points:"):
+                payload = line.split(":", 1)[1].strip()
+                key_insights.extend(
+                    item.strip(" .")
+                    for item in payload.split(",")
+                    if item.strip()
+                )
+                current_section = "insights"
+                continue
+
+            if current_section == "notes":
+                notes.append(line)
             elif current_section == "insights":
-                key_insights.append(line)
+                if "|" in line and line.count("|") >= 2:
+                    key_insights.extend(
+                        part.strip(" -")
+                        for part in line.split("|")
+                        if part.strip(" -")
+                    )
+                else:
+                    key_insights.append(line)
             else:
-                tradeoffs.append(line)
+                explanation_lines.append(line)
 
-        explanation = " ".join(explanation_parts).strip()
+        explanation = " ".join(explanation_lines).strip()
+        bullet_candidates = self._extract_bullets(normalized)
+        sentences = self._extract_sentences(explanation or normalized)
+
+        if not explanation and sentences:
+            explanation = " ".join(sentences[:2]).strip()
         if not explanation:
-            cleaned = answer.replace("Best Answer:", "").replace("Additional Insight:", "").replace("Refinement notes:", "").strip()
-            return cleaned
+            explanation = normalized
 
+        key_insights = self._dedupe_preserve_order(key_insights)[:4]
         if not key_insights:
-            sentences = [segment.strip() for segment in explanation.split(".") if segment.strip()]
-            key_insights = sentences[1:4] if len(sentences) > 1 else []
+            key_insights = self._dedupe_preserve_order(bullet_candidates or sentences[1:5])[:4]
 
-        if not tradeoffs:
-            extracted_notes = [item for item in key_insights if "trade-off" in item.lower() or "reason" in item.lower() or "assumption" in item.lower()]
-            tradeoffs = extracted_notes[:2]
+        notes.extend(
+            item
+            for item in bullet_candidates + sentences
+            if any(
+                token in item.lower()
+                for token in (
+                    "trade-off",
+                    "tradeoff",
+                    "limitation",
+                    "consideration",
+                    "note",
+                    "assumption",
+                    "cost",
+                    "latency",
+                    "complexity",
+                )
+            )
+        )
+        notes = self._dedupe_preserve_order(notes)[:3]
 
-        if not key_insights and not tradeoffs:
+        if normalized.count("|") >= 4 and not key_insights:
+            table_parts = [
+                part.strip(" -")
+                for part in normalized.split("|")
+                if part.strip(" -")
+            ]
+            key_insights = self._dedupe_preserve_order(table_parts)[:4]
+
+        if not key_insights and not notes:
             return explanation
 
         sections = [
-            "### 🧠 Explanation",
+            "### Explanation",
             "",
             explanation,
         ]
 
         if key_insights:
-            sections.extend([
-                "",
-                "---",
-                "",
-                "### 🔍 Key Insights",
-                "",
-            ])
-            sections.extend([f"* {item}" for item in key_insights[:3]])
+            sections.extend(
+                [
+                    "",
+                    "### Key Insights",
+                    "",
+                    *[f"- {item}" for item in key_insights],
+                ]
+            )
 
-        if tradeoffs:
-            sections.extend([
-                "",
-                "---",
-                "",
-                "### ⚖️ Trade-offs / Notes",
-                "",
-            ])
-            sections.extend([f"* {item}" for item in tradeoffs[:2]])
+        if notes:
+            sections.extend(
+                [
+                    "",
+                    "### Trade-offs / Notes",
+                    "",
+                    *[f"- {item}" for item in notes],
+                ]
+            )
 
         return "\n".join(sections).strip()
+
+    def _format_final_answer(self, answer: str) -> str:
+        if not answer.strip():
+            return answer
+
+        structured = self._build_structured_answer(answer)
+        if structured:
+            return structured
+
+        return self._normalize_answer_text(answer)
 
     def _apply_sanity_checks(self, query: str, complexity: dict[str, Any]) -> dict[str, Any]:
         lowered = query.lower()

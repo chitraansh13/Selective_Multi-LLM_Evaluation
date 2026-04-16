@@ -52,7 +52,6 @@ class OpenAIClient(LLMClient):
         api_key = None
         if config.api_key_env:
             import os
-
             api_key = os.getenv(config.api_key_env)
 
         client_kwargs: dict[str, Any] = {}
